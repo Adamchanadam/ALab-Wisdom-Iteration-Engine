@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 答案迭代工具</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 20px;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333333;
+        }
+        h2 {
+            font-size: 1.5rem;
+        }
+        .remarks {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .result h2 {
+            color: #495057;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+        .preformatted {
+            white-space: pre-wrap;
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ced4da;
+        }
+        #logs {
+            max-height: 300px;
+            overflow-y: auto;
+            resize: none;
+        }
+        .description {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .toggle-btn {
+            color: #6c757d;
+            font-size: 0.85rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        .toggle-btn:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <!-- Markdown Renderer -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-2">LLM 答案迭代工具</h1>
+        <div class="remarks">by Adam Chan. 2024-09 (v0.2)</div>
+        <div class="remarks">注意︰本程序使用 {{ MODEL_NAME }} 的內置知識庫回答問題 (數據更新至 2023 年 10 月)，沒有提供網上搜索功能，因此沒有實時數據。<br><br></div>
+
+        <!-- Toggle Button for Description -->
+        <button class="toggle-btn mb-3" type="button" data-toggle="collapse" data-target="#description" aria-expanded="false" aria-controls="description">
+            🗨️ 功能說明
+        </button>
+
+        <!-- Description Section -->
+        <div class="collapse" id="description">
+            <div class="description">
+                <p>本程序使用多層次的 LLM 系統來生成並優化答案。以下是主要功能、技術參數和運作原理：</p>
+                <ul>
+                    <li><strong>輸入問題 (user_question)：</strong> 用戶輸入的問題將成為生成答案的基礎。</li>
+                    <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的直接回答。</li>
+                    <li><strong>多層次 LLM 回答 (Final Optimized LLM Answer)：</strong> 通過多輪優化和評估來生成最終的優化答案。</li>
+                    <li><strong>比較結果 (Comparison Result)：</strong> 比較直接 LLM 回答與多層次 LLM 回答的質量、全面性和準確性。</li>
+                    <li><strong>日誌 (Logs)：</strong> 顯示多層次 LLM 回答過程中的操作日誌。</li>
+                </ul>
+                <h4>技術參數：</h4>
+                <ul>
+                    <li><strong>LLM 模型名稱：</strong> {{ MODEL_NAME }}</li>
+                    <li><strong>最大 token 數量 (max_tokens)：</strong> 1000</li>
+                    <li><strong>溫度設定 (temperature)：</strong> 初始回答 0.5，直接回答 0.7，優化詢問 0.7</li>
+                    <li><strong>最大迭代次數 (max_iterations)：</strong> 3</li>
+                    <li><strong>進行比較的模型名稱：</strong> {{ COMPARISON_MODEL_NAME }}</li>
+                </ul>
+                <h4>運作原理：</h4>
+                <p>本工具基於以下步驟運作：</p>
+                <ol>
+                    <li><strong>生成初始回答：</strong> 根據用戶的問題生成初始回答，並計算使用的 token 數量。</li>
+                    <li><strong>進行評估：</strong> 使用評估提示語來評估初始回答的質量，並為每個方面打分（準確性、全面性、深度、相關例子的使用、論證的邏輯性）。</li>
+                    <li><strong>優化回答：</strong> 根據評估的結果生成新的優化提示語，進行多輪迭代優化，直至滿足設置的評分閾值或達到最大迭代次數。</li>
+                    <li><strong>最終回答：</strong> 選擇評分最高的回答作為最終結果，並將操作日誌記錄下來。</li>
+                    <li><strong>答案比較：</strong> 使用更高級的 LLM 來比較直接 LLM 回答和多層次 LLM 系統的答案，從質量、全面性和準確性三方面進行評分。</li>
+                </ol>
+            </div>
+        </div>
+
+        <form method="POST" id="llmForm">
+            <div class="form-group">
+                <label for="user_question">輸入你的問題:</label>
+                <textarea id="user_question" name="user_question" class="form-control" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">提交</button>
+            <div class="loading-spinner spinner-border text-primary" role="status">
+                <span class="sr-only">載入中...</span>
+            </div>
+        </form>
+
+        <div id="answers">
+            <div class="result mt-4" id="directAnswerSection" style="display:none;">
+                <h2>直接 LLM 回答</h2>
+                <div id="directAnswerContent" class="preformatted"></div>
+            </div>
+
+            <div class="result mt-4" id="finalAnswerSection" style="display:none;">
+                <h2>最終優化後的多層 LLM 回答</h2>
+                <div id="finalAnswerContent" class="preformatted"></div>
+            </div>
+
+            <div class="result mt-4" id="comparisonResultSection" style="display:none;">
+                <h2>答案比較結果</h2>
+                <div id="comparisonResultContent" class="preformatted"></div>
+            </div>
+
+            <div class="result mt-4" id="logsSection" style="display:none;">
+                <h2>日誌</h2>
+                <pre id="logsContent" class="preformatted"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        function clearPreviousResults() {
+            document.getElementById('directAnswerContent').innerText = '';
+            document.getElementById('finalAnswerContent').innerText = '';
+            document.getElementById('comparisonResultContent').innerText = '';
+            document.getElementById('logsContent').innerText = '';
+
+            document.getElementById('directAnswerSection').style.display = 'none';
+            document.getElementById('finalAnswerSection').style.display = 'none';
+            document.getElementById('comparisonResultSection').style.display = 'none';
+            document.getElementById('logsSection').style.display = 'none';
+        }
+
+        document.getElementById('llmForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            document.querySelector('.loading-spinner').style.display = 'inline-block';
+            document.querySelector('button[type="submit"]').disabled = true;
+
+            // 保留新輸入的問題
+            const userQuestion = document.getElementById('user_question').value;
+
+            // 清空上次的結果
+            clearPreviousResults();
+
+            fetch('/direct_llm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_question: userQuestion })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.direct_answer) {
+                    document.getElementById('directAnswerContent').innerText = data.direct_answer;
+                    document.getElementById('directAnswerSection').style.display = 'block';
+
+                    // Initiate the main loop process
+                    fetch('/main_loop', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ user_question: userQuestion, direct_answer: data.direct_answer })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.final_answer) {
+                            document.getElementById('finalAnswerContent').innerText = data.final_answer;
+                            document.getElementById('finalAnswerSection').style.display = 'block';
+                        }
+                        if (data.logs) {
+                            document.getElementById('logsContent').innerText = data.logs;
+                            document.getElementById('logsSection').style.display = 'block';
+                        }
+                        if (data.comparison_result) {
+                            document.getElementById('comparisonResultContent').innerText = data.comparison_result;
+                            document.getElementById('comparisonResultSection').style.display = 'block';
+                        }
+                        document.querySelector('.loading-spinner').style.display = 'none';
+                        document.querySelector('button[type="submit"]').disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error in main loop:', error);
+                        document.querySelector('.loading-spinner').style.display = 'none';
+                        document.querySelector('button[type="submit"]').disabled = false;
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error in direct LLM:', error);
+                document.querySelector('.loading-spinner').style.display = 'none';
+                document.querySelector('button[type="submit"]').disabled = false;
+            });
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const markdown = window.markdownit();
+
+            // Render markdown for each section
+            if (document.getElementById("directAnswerContent")) {
+                const directAnswerText = document.getElementById("directAnswerContent").innerText;
+                document.getElementById("directAnswerContent").innerHTML = markdown.render(directAnswerText);
+            }
+
+            if (document.getElementById("finalAnswerContent")) {
+                const finalAnswerText = document.getElementById("finalAnswerContent").innerText;
+                document.getElementById("finalAnswerContent").innerHTML = markdown.render(finalAnswerText);
+            }
+
+            if (document.getElementById("comparisonResultContent")) {
+                const comparisonResultText = document.getElementById("comparisonResultContent").innerText;
+                document.getElementById("comparisonResultContent").innerHTML = markdown.render(comparisonResultText);
+            }
+
+            if (document.getElementById("logsContent")) {
+                const logsText = document.getElementById("logsContent").innerText;
+                document.getElementById("logsContent").innerHTML = markdown.render(logsText);
+            }
+        });
+    </script>
+</body>
+</html>
