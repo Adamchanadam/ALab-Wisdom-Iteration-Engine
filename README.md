@@ -40,12 +40,16 @@
 應用會在 `http://0.0.0.0:8080` 運行。
 
 ## 目錄結構
-智慧迭代器/
-├── main.py # 主程序文件
-├── templates/ # HTML 模板文件
-│ └── index.html
-├── pyproject.toml # Poetry 配置文件
-└── README.md # 項目說明文件
+<pre><code>
+ALab-Wisdom-Iteration-Engine/
+├── main.py             # 主程序文件
+├── templates/          # HTML 模板文件
+│   └── index.html
+├── pyproject.toml      # Poetry 配置文件
+├── update.sh           # 更新腳本文件
+├── deploy.sh           # 部署腳本文件
+└── README.md           # 項目說明文件
+</code></pre>
 
 
 ## 貢獻
