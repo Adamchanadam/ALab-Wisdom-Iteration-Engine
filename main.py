@@ -3,24 +3,44 @@ from openai import OpenAI
 import os
 import re
 import tiktoken
+import datetime
 
+# 設置 Flask 應用程序
 app = Flask(__name__)
 
+# 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# 設置模型名稱
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
 
+# 記錄搜索日志
+def log_search(user_question, model_name, direct_tokens, final_tokens):
+    log_entry = (
+        f"Date: {datetime.datetime.now()}\n"
+        f"User Question: {user_question}\n"
+        f"Model Used: {model_name}\n"
+        f"Direct LLM Tokens: {direct_tokens}\n"
+        f"Final Optimized LLM Tokens: {final_tokens}\n"
+        "----------------------------------------\n"
+    )
+    with open("system.log", "a") as log_file:
+        log_file.write(log_entry)
+
+# 計算文本的 token 數量
 def count_tokens(text):
     encoder = tiktoken.encoding_for_model(MODEL_NAME)
     return len(encoder.encode(text))
 
+# 格式化回答
 def format_answer(response):
     answer = response.choices[0].message.content.strip()
     if response.choices[0].finish_reason == 'length':
         answer += '... ...'
     return answer
 
+# 使用目標 LLM 生成答案
 def target_llm(prompt, context=""):
     full_prompt = f"{context}\n\n根據以下問題生成答案：{prompt}"
     response = client.chat.completions.create(
@@ -35,6 +55,7 @@ def target_llm(prompt, context=""):
     tokens_used = response.usage.total_tokens
     return answer, tokens_used
 
+# 直接使用 LLM 生成答案
 def direct_llm(prompt):
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -48,6 +69,7 @@ def direct_llm(prompt):
     tokens_used = response.usage.total_tokens
     return answer, tokens_used
 
+# 評估生成的答案質量
 def evaluation_llm(user_question, generated_answer):
     eval_prompt = f"""問題是：{user_question}
 答案是：{generated_answer}
@@ -67,7 +89,7 @@ def evaluation_llm(user_question, generated_answer):
         messages=[
             {"role": "user", "content": eval_prompt}
         ],
-        max_tokens=1200,
+        max_tokens=2000,
         temperature=0.3
     )
 
@@ -91,6 +113,7 @@ def evaluation_llm(user_question, generated_answer):
 
     return total_score / 50, evaluation
 
+# 根據評估結果優化答案
 def optimizer_llm(user_question, current_answer, evaluation):
     optimize_prompt = f"""原始問題：{user_question}
 當前答案：{current_answer}
@@ -117,6 +140,7 @@ def optimizer_llm(user_question, current_answer, evaluation):
 
     return format_answer(response)
 
+# 主循環，用於多層次優化
 def main_loop(user_question):
     logs = []
 
@@ -155,6 +179,7 @@ def main_loop(user_question):
     logs.append(f"\n<多層 LLM 總共使用的 token 數>：{total_tokens}")
     return best_answer, total_tokens, logs
 
+# 比較直接 LLM 和最終優化後 LLM 的答案
 def compare_answers(user_question, direct_answer, final_answer):
     comparison_prompt = f"""
     請比較以下兩個針對使用者問題「{user_question}」的答案：
@@ -173,17 +198,19 @@ def compare_answers(user_question, direct_answer, final_answer):
         messages=[
             {"role": "user", "content": comparison_prompt}
         ],
-        max_tokens=1000,
+        max_tokens=500,
         temperature=0.6
     )
 
     comparison_result = format_answer(response)
     return comparison_result
 
+# 定義主頁路由
 @app.route('/', methods=['GET', 'POST'])
 def home():
     return render_template('index.html', MODEL_NAME=MODEL_NAME)
 
+# 定義直接 LLM 路由
 @app.route('/direct_llm', methods=['POST'])
 def direct_llm_route():
     user_question = request.json.get('user_question')
@@ -192,16 +219,24 @@ def direct_llm_route():
         return jsonify(direct_answer=direct_answer, direct_tokens=direct_tokens)
     return jsonify(error="Invalid input"), 400
 
+# 定義主循環路由
 @app.route('/main_loop', methods=['POST'])
 def main_loop_route():
     user_question = request.json.get('user_question')
-    direct_answer = request.json.get('direct_answer')  # 接收直接 LLM 回答
+    direct_answer = request.json.get('direct_answer')
+    direct_tokens = request.json.get('direct_tokens', 0)  # 获取直接 LLM 回答的 tokens
+
     if user_question and direct_answer:
         final_answer, total_tokens, logs = main_loop(user_question)
         comparison_result = compare_answers(user_question, direct_answer, final_answer)
+
+        # 记录日志
+        log_search(user_question, MODEL_NAME, direct_tokens, total_tokens)
+
         return jsonify(final_answer=final_answer, total_tokens=total_tokens,
                        logs='\n'.join(logs), comparison_result=comparison_result)
     return jsonify(error="Invalid input"), 400
 
+# 主程序入口
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM 答案迭代工具</title>
-    <!-- Bootstrap CSS -->
+    <title>ALab - 智慧迭代器 (Wisdom Iteration Engine)</title>
+    <!-- 引入 Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
+        /* 網頁的基本樣式設置 */
         body {
             font-family: Arial, sans-serif;
             background-color: #f8f9fa;
@@ -84,25 +85,26 @@
             text-decoration: underline;
         }
     </style>
-    <!-- Markdown Renderer -->
+    <!-- 引入 Markdown Renderer -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-2">LLM 答案迭代工具</h1>
-        <div class="remarks">by Adam Chan. 2024-09 (v0.2)</div>
+        <!-- 頁面標題和作者信息 -->
+        <h1 class="mb-2">智慧迭代器 (Wisdom Iteration Engine)</h1>
+        <div class="remarks">by <a href="https://www.facebook.com/chan.adam/" target="_blank">Adam Chan</a>. 2024-09 (v0.3)</div>
         <div class="remarks">注意︰本程序使用 {{ MODEL_NAME }} 的內置知識庫回答問題 (數據更新至 2023 年 10 月)，沒有提供網上搜索功能，因此沒有實時數據。<br><br></div>
 
-        <!-- Toggle Button for Description -->
+        <!-- 功能說明的切換按鈕 -->
         <button class="toggle-btn mb-3" type="button" data-toggle="collapse" data-target="#description" aria-expanded="false" aria-controls="description">
             🗨️ 功能說明
         </button>
 
-        <!-- Description Section -->
+        <!-- 功能說明的內容區域 -->
         <div class="collapse" id="description">
             <div class="description">
-                <p>本程序使用多層次的 LLM 系統來生成並優化答案。以下是主要功能、技術參數和運作原理：</p>
+                <p>這個程序是一個「多層次的答案系統」，旨在通過 LLM 迭代優化來生成高質量的回答，通過多次評估和優化，不斷改進初始回答，最終得到一個更全面、準確、深入的答案。這個系統特別適用於需要深度分析和全面解答的複雜問題。以下是主要功能、技術參數和運作原理：</p>
                 <ul>
                     <li><strong>輸入問題 (user_question)：</strong> 用戶輸入的問題將成為生成答案的基礎。</li>
                     <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的直接回答。</li>
@@ -113,10 +115,9 @@
                 <h4>技術參數：</h4>
                 <ul>
                     <li><strong>LLM 模型名稱：</strong> {{ MODEL_NAME }}</li>
-                    <li><strong>最大 token 數量 (max_tokens)：</strong> 1000</li>
+                    <li><strong>最大 token 數量 (max_tokens)：</strong> 2000</li>
                     <li><strong>溫度設定 (temperature)：</strong> 初始回答 0.5，直接回答 0.7，優化詢問 0.7</li>
                     <li><strong>最大迭代次數 (max_iterations)：</strong> 3</li>
-                    <li><strong>進行比較的模型名稱：</strong> {{ COMPARISON_MODEL_NAME }}</li>
                 </ul>
                 <h4>運作原理：</h4>
                 <p>本工具基於以下步驟運作：</p>
@@ -130,33 +131,40 @@
             </div>
         </div>
 
+        <!-- 提交問題的表單 -->
         <form method="POST" id="llmForm">
             <div class="form-group">
                 <label for="user_question">輸入你的問題:</label>
                 <textarea id="user_question" name="user_question" class="form-control" required></textarea>
             </div>
             <button type="submit" class="btn btn-primary">提交</button>
+            <!-- 載入中提示 -->
             <div class="loading-spinner spinner-border text-primary" role="status">
                 <span class="sr-only">載入中...</span>
             </div>
         </form>
 
+        <!-- 顯示答案的區域 -->
         <div id="answers">
+            <!-- 直接 LLM 回答區域 -->
             <div class="result mt-4" id="directAnswerSection" style="display:none;">
                 <h2>直接 LLM 回答</h2>
                 <div id="directAnswerContent" class="preformatted"></div>
             </div>
 
+            <!-- 最終優化後的多層 LLM 回答區域 -->
             <div class="result mt-4" id="finalAnswerSection" style="display:none;">
                 <h2>最終優化後的多層 LLM 回答</h2>
                 <div id="finalAnswerContent" class="preformatted"></div>
             </div>
 
+            <!-- 答案比較結果區域 -->
             <div class="result mt-4" id="comparisonResultSection" style="display:none;">
                 <h2>答案比較結果</h2>
                 <div id="comparisonResultContent" class="preformatted"></div>
             </div>
 
+            <!-- 日誌區域 -->
             <div class="result mt-4" id="logsSection" style="display:none;">
                 <h2>日誌</h2>
                 <pre id="logsContent" class="preformatted"></pre>
@@ -164,11 +172,12 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS and dependencies -->
+    <!-- 引入 Bootstrap JS 和依賴項 -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
+        // 清空之前的結果
         function clearPreviousResults() {
             document.getElementById('directAnswerContent').innerText = '';
             document.getElementById('finalAnswerContent').innerText = '';
@@ -181,22 +190,20 @@
             document.getElementById('logsSection').style.display = 'none';
         }
 
+        // 提交表單事件監聽器
         document.getElementById('llmForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+            e.preventDefault();  // 防止表單的默認提交行為
             document.querySelector('.loading-spinner').style.display = 'inline-block';
-            document.querySelector('button[type="submit"]').disabled = true;
+            document.querySelector('button[type="submit"]').disabled = true;  // 禁用提交按鈕
 
-            // 保留新輸入的問題
             const userQuestion = document.getElementById('user_question').value;
 
-            // 清空上次的結果
             clearPreviousResults();
 
+            // 發送直接 LLM 的請求
             fetch('/direct_llm', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_question: userQuestion })
             })
             .then(response => response.json())
@@ -205,13 +212,11 @@
                     document.getElementById('directAnswerContent').innerText = data.direct_answer;
                     document.getElementById('directAnswerSection').style.display = 'block';
 
-                    // Initiate the main loop process
+                    // 發送主循環請求進行多層優化
                     fetch('/main_loop', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ user_question: userQuestion, direct_answer: data.direct_answer })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_question: userQuestion, direct_answer: data.direct_answer, direct_tokens: data.direct_tokens })
                     })
                     .then(response => response.json())
                     .then(data => {
@@ -247,7 +252,7 @@
         document.addEventListener("DOMContentLoaded", function() {
             const markdown = window.markdownit();
 
-            // Render markdown for each section
+            // 將每個區塊內容轉換為 markdown
             if (document.getElementById("directAnswerContent")) {
                 const directAnswerText = document.getElementById("directAnswerContent").innerText;
                 document.getElementById("directAnswerContent").innerHTML = markdown.render(directAnswerText);
