@@ -17,8 +17,8 @@
 ### 安裝步驟
 1. 克隆此倉庫：
     ```sh
-    git clone https://github.com/您的用戶名/智慧迭代器.git
-    cd 智慧迭代器
+    git clone https://github.com/Adamchanadam/ALab-Wisdom-Iteration-Engine.git
+    cd ALab-Wisdom-Iteration-Engine
     ```
 
 2. 安裝依賴：
@@ -52,4 +52,4 @@
 歡迎提交 issue 和 pull request 來改進此項目。
 
 ## 許可證
-此項目基於 MIT 許可證 - 詳見 [LICENSE](LICENSE) 文件。
+此項目基於 MIT 許可證 - 詳見 [LICENSE](LICENSE.md) 文件。
