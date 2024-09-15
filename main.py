@@ -56,7 +56,7 @@ def target_llm(prompt, context=""):
         messages=[
             {"role": "user", "content": full_prompt}
         ],
-        max_tokens=1500,  # 增加 token 上限到 1500
+        max_tokens=2000,  # 增加 token 上限到 2000
         temperature=0.5
     )
     answer = format_answer(response)
@@ -70,7 +70,7 @@ def direct_llm(prompt):
         messages=[
             {"role": "user", "content": f"根據以下問題生成答案：{prompt}"}
         ],
-        max_tokens=1000,
+        max_tokens=2000,
         temperature=0.7
     )
     answer = format_answer(response)
@@ -97,7 +97,7 @@ def evaluation_llm(user_question, generated_answer):
         messages=[
             {"role": "user", "content": eval_prompt}
         ],
-        max_tokens=2000,
+        max_tokens=1000,
         temperature=0.3
     )
 
