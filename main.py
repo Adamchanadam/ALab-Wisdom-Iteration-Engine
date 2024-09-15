@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from openai import OpenAI
 import os
 import re
@@ -28,6 +28,14 @@ def log_search(user_question, model_name, direct_tokens, final_tokens):
     with open("system.log", "a") as log_file:
         log_file.write(log_entry)
 
+# 添加查看 system.log 的路由
+@app.route('/view-log', methods=['GET'])
+def view_log():
+    try:
+        return send_file('system.log', as_attachment=False)
+    except Exception as e:
+        return str(e), 500
+
 # 計算文本的 token 數量
 def count_tokens(text):
     encoder = tiktoken.encoding_for_model(MODEL_NAME)
@@ -48,7 +56,7 @@ def target_llm(prompt, context=""):
         messages=[
             {"role": "user", "content": full_prompt}
         ],
-        max_tokens=1000,
+        max_tokens=1500,  # 增加 token 上限到 1500
         temperature=0.5
     )
     answer = format_answer(response)
@@ -170,7 +178,7 @@ def main_loop(user_question):
 
         new_prompt = optimizer_llm(user_question, answer, evaluation)
         context += f"\n前一次回答：{answer}\n評估：{evaluation}\n"
-        answer, tokens = target_llm(new_prompt, context)
+        answer, tokens = target_llm(new_prompt, context)  # 使用新的 token 上限
         total_tokens += tokens
         iteration_count += 1
 
@@ -230,7 +238,7 @@ def main_loop_route():
         final_answer, total_tokens, logs = main_loop(user_question)
         comparison_result = compare_answers(user_question, direct_answer, final_answer)
 
-        # 记录日志
+        # 記錄日誌
         log_search(user_question, MODEL_NAME, direct_tokens, total_tokens)
 
         return jsonify(final_answer=final_answer, total_tokens=total_tokens,
