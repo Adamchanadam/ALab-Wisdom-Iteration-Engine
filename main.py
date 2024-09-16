@@ -15,7 +15,7 @@ storage_client = Client()
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
 # 記錄搜索日志
-def log_search(user_question, model_name, direct_tokens, final_tokens):
+def log_search(user_question, model_name, direct_tokens, final_tokens, best_score):
     log_entry = (
         f"Date: {datetime.datetime.now()}\n"
         f"User Question: {user_question}\n"
@@ -192,7 +192,7 @@ def main_loop(user_question):
     logs.append(f"\n===== 最終多層 LLM 回答（評分：{best_score:.2f}）=====")
     logs.append(best_answer)
     logs.append(f"\n<多層 LLM 總共使用的 token 數>：{total_tokens}")
-    return best_answer, total_tokens, logs
+    return best_answer, total_tokens, logs , best_score
 
 # 比較直接 LLM 和最終優化後 LLM 的答案
 def compare_answers(user_question, direct_answer, final_answer):
@@ -240,14 +240,11 @@ def main_loop_route():
     user_question = request.json.get('user_question')
     direct_answer = request.json.get('direct_answer')
     direct_tokens = request.json.get('direct_tokens', 0)
-
     if user_question and direct_answer:
-        final_answer, total_tokens, logs = main_loop(user_question)
+        final_answer, total_tokens, logs, best_score = main_loop(user_question)
         comparison_result = compare_answers(user_question, direct_answer, final_answer)
-
         # 記錄日誌
-        log_search(user_question, MODEL_NAME, direct_tokens, total_tokens)
-
+        log_search(user_question, MODEL_NAME, direct_tokens, total_tokens, best_score)
         return jsonify(final_answer=final_answer, total_tokens=total_tokens,
                        logs='\n'.join(logs), comparison_result=comparison_result)
     return jsonify(error="Invalid input"), 400
