@@ -1,21 +1,21 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify
 from openai import OpenAI
 import os
 import re
 import tiktoken
 import datetime
+from replit import object_storage #儲存 system.log
 
 # 設置 Flask 應用程序
 app = Flask(__name__)
-
 # 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+# 初始化 Object Storage 客戶端
+storage_client = object_storage.Client()
 # 設置模型名稱
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
-
-# 記錄搜索日志
+# 記錄搜索日志到 Object Storage
 def log_search(user_question, model_name, direct_tokens, final_tokens):
     log_entry = (
         f"Date: {datetime.datetime.now()}\n"
@@ -25,14 +25,21 @@ def log_search(user_question, model_name, direct_tokens, final_tokens):
         f"Final Optimized LLM Tokens: {final_tokens}\n"
         "----------------------------------------\n"
     )
-    with open("system.log", "a") as log_file:
-        log_file.write(log_entry)
-
+    # 讀取現有的日誌文件內容
+    try:
+        existing_log = storage_client.download_text("system.log")
+    except object_storage.NotFoundError:
+        existing_log = ""
+    # 新增日誌內容並上傳回 Object Storage
+    new_log_content = existing_log + log_entry
+    storage_client.upload_text("system.log", new_log_content)
+    
 # 添加查看 system.log 的路由
 @app.route('/view-log', methods=['GET'])
 def view_log():
     try:
-        return send_file('system.log', as_attachment=False)
+        log_content = storage_client.download_text("system.log")
+        return log_content, 200
     except Exception as e:
         return str(e), 500
 
