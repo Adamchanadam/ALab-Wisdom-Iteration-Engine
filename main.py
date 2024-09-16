@@ -1,21 +1,20 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from openai import OpenAI
 import os
 import re
 import tiktoken
 import datetime
-from replit import object_storage #儲存 system.log
-
+from replit.object_storage import Client  # 引入 Replit Object Storage
 # 設置 Flask 應用程序
 app = Flask(__name__)
 # 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-# 初始化 Object Storage 客戶端
-storage_client = object_storage.Client()
+# 初始化 Replit Object Storage 客戶端
+storage_client = Client()
 # 設置模型名稱
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
-# 記錄搜索日志到 Object Storage
+# 記錄搜索日志
 def log_search(user_question, model_name, direct_tokens, final_tokens):
     log_entry = (
         f"Date: {datetime.datetime.now()}\n"
@@ -23,23 +22,24 @@ def log_search(user_question, model_name, direct_tokens, final_tokens):
         f"Model Used: {model_name}\n"
         f"Direct LLM Tokens: {direct_tokens}\n"
         f"Final Optimized LLM Tokens: {final_tokens}\n"
+        f"Best Score: {best_score:.2f}\n"
         "----------------------------------------\n"
     )
-    # 讀取現有的日誌文件內容
+    log_filename = "adam-llm-iteration.log"  # system log
+    # 上傳日誌到 Object Storage
+    existing_log = ""
     try:
-        existing_log = storage_client.download_text("adam-llm-iteration_system.log")
-    except object_storage.NotFoundError:
-        existing_log = ""
-    # 新增日誌內容並上傳回 Object Storage
-    new_log_content = existing_log + log_entry
-    storage_client.upload_text("adam-llm-iteration_system.log", new_log_content)
-    
-# 添加查看 system.log 的路由
+        existing_log = storage_client.download_as_text(log_filename)
+    except Exception:
+        pass  # 日誌文件不存在，略過
+    new_log = existing_log + log_entry
+    storage_client.upload_from_text(log_filename, new_log)
+# 添加查看 adam-llm-iteration.log 的路由
 @app.route('/view-log', methods=['GET'])
 def view_log():
     try:
-        log_content = storage_client.download_text("adam-llm-iteration_system.log")
-        return log_content, 200
+        log_content = storage_client.download_as_text("adam-llm-iteration.log") 
+        return log_content
     except Exception as e:
         return str(e), 500
 
@@ -239,7 +239,7 @@ def direct_llm_route():
 def main_loop_route():
     user_question = request.json.get('user_question')
     direct_answer = request.json.get('direct_answer')
-    direct_tokens = request.json.get('direct_tokens', 0)  # 获取直接 LLM 回答的 tokens
+    direct_tokens = request.json.get('direct_tokens', 0)
 
     if user_question and direct_answer:
         final_answer, total_tokens, logs = main_loop(user_question)
@@ -254,4 +254,4 @@ def main_loop_route():
 
 # 主程序入口
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, debug=True)
