@@ -27,18 +27,18 @@ def log_search(user_question, model_name, direct_tokens, final_tokens):
     )
     # 讀取現有的日誌文件內容
     try:
-        existing_log = storage_client.download_text("system.log")
+        existing_log = storage_client.download_text("adam-llm-iteration_system.log")
     except object_storage.NotFoundError:
         existing_log = ""
     # 新增日誌內容並上傳回 Object Storage
     new_log_content = existing_log + log_entry
-    storage_client.upload_text("system.log", new_log_content)
+    storage_client.upload_text("adam-llm-iteration_system.log", new_log_content)
     
 # 添加查看 system.log 的路由
 @app.route('/view-log', methods=['GET'])
 def view_log():
     try:
-        log_content = storage_client.download_text("system.log")
+        log_content = storage_client.download_text("adam-llm-iteration_system.log")
         return log_content, 200
     except Exception as e:
         return str(e), 500
