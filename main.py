@@ -1,19 +1,25 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify
 from openai import OpenAI
 import os
 import re
 import tiktoken
 import datetime
+import json
 from replit.object_storage import Client  # 引入 Replit Object Storage
+
 # 設置 Flask 應用程序
 app = Flask(__name__)
+
 # 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # 初始化 Replit Object Storage 客戶端
 storage_client = Client()
+
 # 設置模型名稱
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
+
 # 記錄搜索日志
 def log_search(user_question, model_name, direct_tokens, final_tokens, best_score):
     log_entry = (
@@ -34,6 +40,7 @@ def log_search(user_question, model_name, direct_tokens, final_tokens, best_scor
         pass  # 日誌文件不存在，略過
     new_log = existing_log + log_entry
     storage_client.upload_from_text(log_filename, new_log)
+
 # 添加查看 adam-llm-iteration.log 的路由
 @app.route('/view-log', methods=['GET'])
 def view_log():
@@ -104,29 +111,31 @@ def evaluation_llm(user_question, generated_answer):
         messages=[
             {"role": "user", "content": eval_prompt}
         ],
-        max_tokens=1000,
+        max_tokens=800,
         temperature=0.3
     )
 
     evaluation = response.choices[0].message.content.strip()
+    print("Evaluation response:", evaluation)  # 加入日誌輸出
+
+    scores = []
 
     total_score_match = re.search(r'總評分：\s*(\d+(?:\.\d+)?)/50', evaluation)
     if total_score_match:
         total_score = float(total_score_match.group(1))
     else:
-        scores = []
-        for aspect in ["準確性", "全面性", "深度", "相關例子", "論證的邏輯性"]:
-            score_match = re.search(rf'{aspect}\s*\((\d+)/10\)', evaluation)
-            if score_match:
-                scores.append(int(score_match.group(1)))
+        total_score = 0  # 確保 total_score 始終有值
 
-        if scores:
-            total_score = sum(scores)
+    for aspect in ["準確性", "全面性", "深度", "相關例子", "論證的邏輯性"]:
+        # 修改正則表達式考慮空格情況
+        score_match = re.search(rf'{aspect}.*?(\d+)/10', evaluation)
+        print(f"Matching {aspect}: ", score_match)  # 日誌輸出匹配情況
+        if score_match:
+            scores.append((aspect, int(score_match.group(1))))
         else:
-            print("警告：無法提取評分，返回默認分數 0")
-            total_score = 0
+            scores.append((aspect, 0))  # 若無匹配則設為0
 
-    return total_score / 50, evaluation
+    return total_score / 50, evaluation, scores  # 返回每個方面的分數
 
 # 根據評估結果優化答案
 def optimizer_llm(user_question, current_answer, evaluation):
@@ -136,11 +145,12 @@ def optimizer_llm(user_question, current_answer, evaluation):
 
 根據以上信息，請生成一個新的提示，以改進答案的質量。新提示應該：
 1. 針對評估中指出的不足之處
-2. 保留原答案中的優點
-3. 鼓勵更深入、更全面的回答
+2. 保留原答案中的優點，
+3. 鼓勵更深入、更全面與題目有關的回答
 4. 要求提供更多相關的具體例子
-5. 引用學術研究數據去支持論點(要有出處)
-6. 如涉及專業名詞、人名、地方名、公司名稱等，要使用中英對照
+5. 只引用可靠的學術研究數據去支持論點(必須提供資料來源、出處，嚴止使用虛構內容)
+6. 如果涉及專業名詞、人名、地方名、公司名稱等必須真實存在，名稱要使用中英對照
+7. 對於不確定的答案，不用回答
 
 請生成新的提示："""
 
@@ -149,8 +159,8 @@ def optimizer_llm(user_question, current_answer, evaluation):
         messages=[
             {"role": "user", "content": optimize_prompt}
         ],
-        max_tokens=500,
-        temperature=0.7
+        max_tokens=800,
+        temperature=0.5
     )
 
     return format_answer(response)
@@ -158,12 +168,11 @@ def optimizer_llm(user_question, current_answer, evaluation):
 # 主循環，用於多層次優化
 def main_loop(user_question):
     logs = []
-
+    iterations_data = []  # 新增變量以保存每次迭代的數據
     logs.append("\n===== 多層次 LLM (初始回答) =====")
     initial_answer, initial_tokens = target_llm(user_question)
     logs.append(initial_answer)
     logs.append(f"\n<初始回答使用的 token 數>：{initial_tokens}")
-
     answer = initial_answer
     context = ""
     iteration_count = 0
@@ -171,28 +180,33 @@ def main_loop(user_question):
     best_score = 0
     best_answer = answer
     total_tokens = initial_tokens
-
     for i in range(max_iterations):
-        score, evaluation = evaluation_llm(user_question, answer)
+        score, evaluation, scores_details = evaluation_llm(user_question, answer)
         logs.append(f"\n迭代 {i+1} - 評分: {score:.2f}")
-
+        logs.append(f"詳細評分: {scores_details}")  # 在日誌中顯示詳細評分
+        # 保存每次迭代的數據
+        iterations_data.append({
+            'iteration': i + 1,
+            'answer': answer,
+            'score': score,
+            'evaluation': evaluation,
+            'scores_details': scores_details  # 新增
+        })
         if score > best_score:
             best_score = score
             best_answer = answer
-
         if score > 0.9:
             break
-
         new_prompt = optimizer_llm(user_question, answer, evaluation)
         context += f"\n前一次回答：{answer}\n評估：{evaluation}\n"
         answer, tokens = target_llm(new_prompt, context)  # 使用新的 token 上限
         total_tokens += tokens
         iteration_count += 1
-
     logs.append(f"\n===== 最終多層 LLM 回答（評分：{best_score:.2f}）=====")
     logs.append(best_answer)
     logs.append(f"\n<多層 LLM 總共使用的 token 數>：{total_tokens}")
-    return best_answer, total_tokens, logs , best_score
+    # 將 iterations_data 加入返回結果
+    return best_answer, total_tokens, logs, best_score, iterations_data
 
 # 比較直接 LLM 和最終優化後 LLM 的答案
 def compare_answers(user_question, direct_answer, final_answer):
@@ -231,22 +245,36 @@ def direct_llm_route():
     user_question = request.json.get('user_question')
     if user_question:
         direct_answer, direct_tokens = direct_llm(user_question)
-        return jsonify(direct_answer=direct_answer, direct_tokens=direct_tokens)
+        # 評估直接回答
+        direct_score, _, _ = evaluation_llm(user_question, direct_answer)
+        return jsonify(
+            direct_answer=direct_answer,
+            direct_tokens=direct_tokens,
+            direct_score=direct_score * 10  # 總評分轉為10分制
+        )
     return jsonify(error="Invalid input"), 400
 
-# 定義主循環路由
+# 主循環路由
 @app.route('/main_loop', methods=['POST'])
 def main_loop_route():
     user_question = request.json.get('user_question')
     direct_answer = request.json.get('direct_answer')
     direct_tokens = request.json.get('direct_tokens', 0)
+    direct_score = request.json.get('direct_score', 0)
     if user_question and direct_answer:
-        final_answer, total_tokens, logs, best_score = main_loop(user_question)
+        final_answer, total_tokens, logs, best_score, iterations_data = main_loop(user_question)
         comparison_result = compare_answers(user_question, direct_answer, final_answer)
         # 記錄日誌
         log_search(user_question, MODEL_NAME, direct_tokens, total_tokens, best_score)
-        return jsonify(final_answer=final_answer, total_tokens=total_tokens,
-                       logs='\n'.join(logs), comparison_result=comparison_result)
+        return jsonify(
+            final_answer=final_answer,
+            final_score=best_score * 10,  # 總評分轉為10分制
+            direct_score=direct_score,  # 直接回答的評分
+            total_tokens=total_tokens,
+            logs='\n'.join(logs),
+            comparison_result=comparison_result,
+            iterations_data=json.dumps(iterations_data, ensure_ascii=False)
+        )
     return jsonify(error="Invalid input"), 400
 
 # 主程序入口
