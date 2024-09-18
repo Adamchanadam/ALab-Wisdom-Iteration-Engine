@@ -1,4 +1,4 @@
-# 智慧迭代器 (Wisdom Iteration Engine)
+# 答案迭代器 (Answer Iteration Engine)
 
 ## 簡介
 這個項目是一個基於 Flask 和 OpenAI 的多層次答案生成系統，旨在通過迭代優化來生成高質量的回答。系統通過多次評估和優化，不斷改進初始回答，適用於需要深度分析和全面解答的複雜問題。

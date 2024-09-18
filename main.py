@@ -70,7 +70,7 @@ def target_llm(prompt, context=""):
         messages=[
             {"role": "user", "content": full_prompt}
         ],
-        max_tokens=2000,  # 增加 token 上限到 2000
+        max_tokens=2000,
         temperature=0.5
     )
     answer = format_answer(response)
@@ -92,6 +92,7 @@ def direct_llm(prompt):
     return answer, tokens_used
 
 # 評估生成的答案質量
+
 def evaluation_llm(user_question, generated_answer):
     eval_prompt = f"""問題是：{user_question}
 答案是：{generated_answer}
@@ -103,7 +104,7 @@ def evaluation_llm(user_question, generated_answer):
 4. 相關例子的使用 (0-10分)
 5. 論證的邏輯性 (0-10分)
 
-為每個方面打分，並給出簡要評論。最後，給出總評分（滿分50分）和改進建議。
+為每個方面打分，並給出簡要評論。最後，給出 "'總評分"（滿分50分）和 "改進建議:"。
 請確保在評分後明確標註"總評分："，例如"總評分：42/50"。"""
 
     response = client.chat.completions.create(
@@ -137,7 +138,6 @@ def evaluation_llm(user_question, generated_answer):
 
     return total_score / 50, evaluation, scores  # 返回每個方面的分數
 
-# 根據評估結果優化答案
 def optimizer_llm(user_question, current_answer, evaluation):
     optimize_prompt = f"""原始問題：{user_question}
 當前答案：{current_answer}

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,32 +15,40 @@
             margin: 20px;
             padding: 20px;
         }
+
         .container {
             background-color: #ffffff;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #333333;
         }
+
         h2 {
             font-size: 1.5rem;
         }
+
         .remarks {
             color: #6c757d;
             font-size: 0.9rem;
         }
+
         .form-group label {
             font-weight: bold;
         }
+
         .btn-primary {
             background-color: #007bff;
             border-color: #007bff;
         }
+
         .loading-spinner {
             display: none;
         }
+
         .result {
             margin-top: 20px;
             padding: 20px;
@@ -47,13 +56,16 @@
             border-radius: 8px;
             background-color: #f8f9fa;
         }
+
         .result h2 {
             color: #495057;
         }
+
         .btn-secondary {
             background-color: #6c757d;
             border-color: #6c757d;
         }
+
         .preformatted {
             white-space: pre-wrap;
             font-family: monospace;
@@ -62,12 +74,14 @@
             border-radius: 5px;
             border: 1px solid #ced4da;
         }
+
         .description {
             background-color: #f8f9fa;
             padding: 20px;
             border: 1px solid #dee2e6;
             border-radius: 8px;
         }
+
         .toggle-btn {
             color: #6c757d;
             font-size: 0.85rem;
@@ -76,6 +90,7 @@
             cursor: pointer;
             padding: 0;
         }
+
         .toggle-btn:hover {
             text-decoration: underline;
         }
@@ -85,6 +100,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="container">
         <!-- 頁面標題和作者信息 -->
@@ -103,8 +119,8 @@
                 <p>這個程序是一個「多層次的答案系統」，旨在通過 LLM 迭代優化來生成高質量的回答，通過多次評估和優化，不斷改進初始回答，最終得到一個更全面、準確、深入的答案。這個系統特別適用於需要深度分析和全面解答的複雜問題。以下是主要功能、技術參數和運作原理：</p>
                 <ul>
                     <li><strong>輸入問題 (user_question)：</strong> 用戶輸入的問題將成為生成答案的基礎。</li>
-                    <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的直接回答。 </li>
-                    <li><strong>多層次 LLM 回答 (Final Optimized LLM Answer)：</strong> 通過多輪優化和評估來生成最終的優化答案。 </li>
+                    <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的直接回答。</li>
+                    <li><strong>多層次 LLM 回答 (Final Optimized LLM Answer)：</strong> 根據評估和優化來生成最終的優化答案。</li>
                     <li><strong>比較結果 (Comparison Result)：</strong> 比較直接 LLM 回答與多層次 LLM 回答的質量、全面性和準確性。</li>
                 </ul>
                 <h4>技術參數：</h4>
@@ -112,7 +128,7 @@
                     <li><strong>LLM 模型名稱：</strong> {{ MODEL_NAME }}</li>
                     <li><strong>最大 token 數量 (max_tokens)：</strong> 2000</li>
                     <li><strong>溫度設定 (temperature)：</strong> 初始回答 0.5，直接回答 0.7，優化詢問 0.7</li>
-                    <li><strong>最大迭代次數 (max_iterations)：</strong> 3</li>
+                    <li><strong>最大迴代次數 (max_iterations)：</strong> 3</li>
                 </ul>
                 <h4>運作原理：</h4>
                 <p>本工具基於以下步驟運作：</p>
@@ -164,8 +180,9 @@
                 <h2>迭代過程圖表</h2>
                 <canvas id="iterationChart"></canvas>
                 <!-- 新增用戶輸入問題顯示區域 -->
-                <div class="remarks mt-2" style="color: gray; font-size: 0.9rem;">🤔 問題: <span id="userQuestionDisplay"></span>
-                </div>
+                <div class="remarks mt-2" style="color: gray; font-size: 0.9rem;">🤔 問題: <span id="userQuestionDisplay"></span></div>
+            </div>
+        </div>
     </div>
 
     <!-- 引入 Bootstrap JS 和依賴項 -->
@@ -354,11 +371,11 @@
             if (document.getElementById("directAnswerContent")) {
                 const directAnswerText = document.getElementById("directAnswerContent").innerText;
                 document.getElementById("directAnswerContent").innerHTML = markdown.render(directAnswerText);
-                }
+            }
             if (document.getElementById("finalAnswerContent")) {
                 const finalAnswerText = document.getElementById("finalAnswerContent").innerText;
                 document.getElementById("finalAnswerContent").innerHTML = markdown.render(finalAnswerText);
-                }
+            }
             if (document.getElementById("comparisonResultContent")) {
                 const comparisonResultText = document.getElementById("comparisonResultContent").innerText;
                 document.getElementById("comparisonResultContent").innerHTML = markdown.render(comparisonResultText);
