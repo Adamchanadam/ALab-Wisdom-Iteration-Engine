@@ -8,7 +8,6 @@
     <!-- 引入 Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
-        /* 網頁的基本樣式設置 */
         body {
             font-family: Arial, sans-serif;
             background-color: #f8f9fa;
@@ -76,6 +75,7 @@
         }
 
         .description {
+            font-size: 0.9rem;
             background-color: #f8f9fa;
             padding: 20px;
             border: 1px solid #dee2e6;
@@ -94,6 +94,13 @@
         .toggle-btn:hover {
             text-decoration: underline;
         }
+
+        .result-title {
+            font-size: 1.5rem;
+            color: #495057;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
     </style>
     <!-- 引入 Markdown Renderer -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.css">
@@ -103,284 +110,392 @@
 
 <body>
     <div class="container">
-        <!-- 頁面標題和作者信息 -->
         <h1 class="mb-2">答案迭代器 (Answer Iteration Engine)</h1>
-        <div class="remarks">by <a href="https://www.facebook.com/chan.adam/" target="_blank">Adam Chan</a>. 2024-09 (v0.4) 😃如果這工具對你有用，歡迎發個訊息👍給作者以示鼓勵。</div>
+        <div class="remarks">by <a href="https://www.facebook.com/chan.adam/" target="_blank">Adam Chan</a>. 2024-09 (v1.0) 😃如果這工具對你有用，歡迎發個訊息👍給作者以示鼓勵。</div>
         <div class="remarks">注意︰本程序使用 {{ MODEL_NAME }} 的內置知識庫回答問題 (數據更新至 2023 年 10 月)，沒有提供網上搜索功能，因此沒有實時數據。<br><br></div>
 
-        <!-- 功能說明的切換按鈕 -->
         <button class="toggle-btn mb-3" type="button" data-toggle="collapse" data-target="#description" aria-expanded="false" aria-controls="description">
             🗨️ 功能說明
         </button>
-
-        <!-- 功能說明的內容區域 -->
         <div class="collapse" id="description">
             <div class="description">
-                <p>這個程序是一個「多層次的答案系統」，旨在通過 LLM 迭代優化來生成高質量的回答，通過多次評估和優化，不斷改進初始回答，最終得到一個更全面、準確、深入的答案。這個系統特別適用於需要深度分析和全面解答的複雜問題。以下是主要功能、技術參數和運作原理：</p>
+                <p>這個程序是一個「多層次的答案系統」，旨在通過 LLM（大型語言模型）迭代優化來生成高質量的回答。通過多次評估和優化，系統不斷改進初始回答，最終得到一個更全面、準確、深入的答案。以下是主要功能、技術參數和運作原理：</p>
+
+                <h4>主要功能：</h4>
                 <ul>
                     <li><strong>輸入問題 (user_question)：</strong> 用戶輸入的問題將成為生成答案的基礎。</li>
-                    <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的直接回答。</li>
-                    <li><strong>多層次 LLM 回答 (Final Optimized LLM Answer)：</strong> 根據評估和優化來生成最終的優化答案。</li>
+                    <li><strong>直接 LLM 回答 (Direct LLM Answer)：</strong> 使用 LLM 生成的初始直接回答。</li>
+                    <li><strong>多層次 LLM 回答 (Final Optimized LLM Answer)：</strong> 根據評估和多輪優化後生成的最終答案。</li>
                     <li><strong>比較結果 (Comparison Result)：</strong> 比較直接 LLM 回答與多層次 LLM 回答的質量、全面性和準確性。</li>
+                    <li><strong>迭代過程圖表：</strong> 視覺化展示答案優化的過程，包括總分和各項評分的變化。</li>
                 </ul>
+
                 <h4>技術參數：</h4>
                 <ul>
                     <li><strong>LLM 模型名稱：</strong> {{ MODEL_NAME }}</li>
                     <li><strong>最大 token 數量 (max_tokens)：</strong> 2000</li>
                     <li><strong>溫度設定 (temperature)：</strong> 初始回答 0.5，直接回答 0.7，優化詢問 0.7</li>
-                    <li><strong>最大迴代次數 (max_iterations)：</strong> 3</li>
+                    <li><strong>最大迭代次數 (max_iterations)：</strong> 3</li>
+                    <li><strong>評分系統：</strong> 包括準確性、全面性、深度、相關例子的使用和論證的邏輯性五個方面，每項滿分為10分。</li>
                 </ul>
+
                 <h4>運作原理：</h4>
-                <p>本工具基於以下步驟運作：</p>
                 <ol>
                     <li><strong>生成初始回答：</strong> 根據用戶的問題生成初始回答，並計算使用的 token 數量。</li>
-                    <li><strong>進行評估：</strong> 使用評估提示語來評估初始回答的質量，並為每個方面打分（準確性、全面性、深度、相關例子的使用、論證的邏輯性）。</li>
+                    <li><strong>進行評估：</strong> 使用評估提示語來評估初始回答的質量，並為每個方面打分。</li>
                     <li><strong>優化回答：</strong> 根據評估的結果生成新的優化提示語，進行多輪迭代優化，直至滿足設置的評分閾值或達到最大迭代次數。</li>
                     <li><strong>最終回答：</strong> 選擇評分最高的回答作為最終結果。</li>
                     <li><strong>答案比較：</strong> 使用更高級的 LLM 來比較直接 LLM 回答和多層次 LLM 系統的答案，從質量、全面性和準確性三方面進行評分。</li>
+                    <li><strong>可視化呈現：</strong> 使用圖表展示迭代優化過程，並以 Markdown 格式渲染所有文本輸出以提高可讀性。</li>
                 </ol>
+
+                <h4>使用說明：</h4>
+                <p>用戶只需要在文本框中輸入問題並提交，系統將自動進行處理並顯示結果。請注意，多層次優化可能需要一些時間，這是為了確保答案的質量。</p>
+
+                <h4>系統限制：</h4>
+                <p>本系統使用的知識庫更新至 2023 年 10 月，不具備實時網絡搜索功能。因此，對於最新事件或實時數據可能無法提供準確信息。</p>
+
+                <h4>適用場景：</h4>
+                <p>這個系統特別適合需要深入分析、多角度思考的複雜問題，如學術研究問題、政策分析、商業策略制定等。它能夠提供比單一回答更全面、更深入的見解。</p>
             </div>
         </div>
 
-        <!-- 提交問題的表單 -->
         <form method="POST" id="llmForm">
             <div class="form-group">
                 <label for="user_question">🤔 輸入你的問題:</label>
                 <textarea id="user_question" name="user_question" class="form-control" required></textarea>
             </div>
+            <button class="toggle-btn mb-3" type="button" data-toggle="collapse" data-target="#advancedOptions" aria-expanded="false" aria-controls="advancedOptions">
+                ➕ 進階功能
+            </button>
+            <div class="collapse" id="advancedOptions">
+                <div class="form-group">
+                    <label for="additional_info">請輸入可靠的補充資料（可包括最多 3 條網址）:</label>
+                    <textarea id="additional_info" name="additional_info" class="form-control"></textarea>
+                </div>
+            </div>
+            <br>
             <button type="submit" class="btn btn-primary">提交</button>
-            <!-- 載入中提示 -->
             <div class="loading-spinner spinner-border text-primary" role="status">
                 <span class="sr-only">載入中...</span>
             </div>
         </form>
 
-        <!-- 顯示答案的區域 -->
         <div id="answers">
-            <!-- 直接 LLM 回答區域 -->
             <div class="result mt-4" id="directAnswerSection" style="display:none;">
                 <h2>直接 LLM 回答 (Token: <span id="directTokens"></span>, 評分: <span id="directScore"></span>)</h2>
                 <div id="directAnswerContent" class="preformatted"></div>
+                <!-- 新增核心事實區塊 -->
+                <div class="mt-3" id="coreFacts">
+                    <h2 class="result-title">核心事實:</h2>
+                    <ul id="coreFactsList" class="list-group"></ul>
+                </div>
             </div>
 
-            <!-- 最終優化後的多層 LLM 回答區域 -->
             <div class="result mt-4" id="finalAnswerSection" style="display:none;">
                 <h2>最終優化後的多層 LLM 回答 (Token: <span id="finalTokens"></span>, 評分: <span id="finalScore"></span>)</h2>
                 <div id="finalAnswerContent" class="preformatted"></div>
             </div>
 
-            <!-- 答案比較結果區域 -->
             <div class="result mt-4" id="comparisonResultSection" style="display:none;">
                 <h2>答案比較結果</h2>
-                <div id="comparisonResultContent" class="preformatted"></div>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>評分項目</th>
+                            <th>直接 LLM 回答</th>
+                            <th>多層次 LLM 回答</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonTable">
+                        <!-- 將通過 JavaScript 填充 -->
+                    </tbody>
+                </table>
+                <div id="comparisonResultContent" class="preformatted mt-3"></div>
             </div>
 
-            <!-- 新增圖表區域 -->
             <div class="result mt-4" id="chartSection" style="display:none;">
                 <h2>迭代過程圖表</h2>
                 <canvas id="iterationChart"></canvas>
-                <!-- 新增用戶輸入問題顯示區域 -->
                 <div class="remarks mt-2" style="color: gray; font-size: 0.9rem;">🤔 問題: <span id="userQuestionDisplay"></span></div>
             </div>
         </div>
     </div>
 
-    <!-- 引入 Bootstrap JS 和依賴項 -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // 清空之前的結果
-        function clearPreviousResults() {
-            document.getElementById('directAnswerContent').innerText = '';
-            document.getElementById('finalAnswerContent').innerText = '';
-            document.getElementById('comparisonResultContent').innerText = '';
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('llmForm');
+            const loadingSpinner = document.querySelector('.loading-spinner');
+            const submitButton = document.querySelector('button[type="submit"]');
 
-            document.getElementById('directAnswerSection').style.display = 'none';
-            document.getElementById('finalAnswerSection').style.display = 'none';
-            document.getElementById('comparisonResultSection').style.display = 'none';
-            document.getElementById('chartSection').style.display = 'none';  // 新增
-        }
+            form.addEventListener('submit', function(e) {
+                e.preventDefault(); // 阻止表單的默認提交行為
 
-        // 提交表單事件監聽器
-        document.getElementById('llmForm').addEventListener('submit', function(e) {
-            e.preventDefault();  // 防止表單的默認提交行為
-            document.querySelector('.loading-spinner').style.display = 'inline-block';
-            document.querySelector('button[type="submit"]').disabled = true;  // 禁用提交按鈕
+                loadingSpinner.style.display = 'inline-block';
+                submitButton.disabled = true;
 
-            const userQuestion = document.getElementById('user_question').value;
+                const userQuestion = document.getElementById('user_question').value;
+                const additionalInfo = document.getElementById('additional_info').value;
 
-            // 在圖表部分顯示用戶輸入的問題
-            document.getElementById('userQuestionDisplay').innerText = userQuestion;
+                document.getElementById('userQuestionDisplay').innerText = userQuestion;
 
-            clearPreviousResults();
+                clearPreviousResults();
 
-            // 發送直接 LLM 的請求
-            fetch('/direct_llm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_question: userQuestion })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.direct_answer) {
-                    document.getElementById('directAnswerContent').innerText = data.direct_answer;
-                    document.getElementById('directTokens').innerText = data.direct_tokens;
-                    document.getElementById('directScore').innerText = data.direct_score.toFixed(2);
-                    document.getElementById('directAnswerSection').style.display = 'block';
-
-                    // 發送主循環請求進行多層優化
-                    fetch('/main_loop', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_question: userQuestion, direct_answer: data.direct_answer, direct_tokens: data.direct_tokens, direct_score: data.direct_score })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.final_answer) {
-                            document.getElementById('finalAnswerContent').innerText = data.final_answer;
-                            document.getElementById('finalTokens').innerText = data.total_tokens;
-                            document.getElementById('finalScore').innerText = data.final_score.toFixed(2);
-                            document.getElementById('finalAnswerSection').style.display = 'block';
-                        }
-                        if (data.comparison_result) {
-                            document.getElementById('comparisonResultContent').innerText = data.comparison_result;
-                            document.getElementById('comparisonResultSection').style.display = 'block';
-                        }
-                        if (data.iterations_data) {
-                            const iterationsData = JSON.parse(data.iterations_data);
-                            drawChart(data.direct_score, iterationsData);  // 繪製圖表的調用
-                            document.getElementById('chartSection').style.display = 'block';
-                        }
-                        document.querySelector('.loading-spinner').style.display = 'none';
-                        document.querySelector('button[type="submit"]').disabled = false;
-                    })
-                    .catch(error => {
-                        console.error('Error in main loop:', error);
-                        document.querySelector('.loading-spinner').style.display = 'none';
-                        document.querySelector('button[type="submit"]').disabled = false;
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error in direct LLM:', error);
-                document.querySelector('.loading-spinner').style.display = 'none';
-                document.querySelector('button[type="submit"]').disabled = false;
-            });
-        });
-
-        // 用於繪製圖表的函數
-        function drawChart(directScore, iterationsData) {
-            const labels = ['Direct LLM', ...iterationsData.map(d => `Iteration ${d.iteration}`)];
-            const scores = [directScore, ...iterationsData.map(d => d.score * 10)];  // 將總評分轉換為10分制
-            const accuracyScores = Array(iterationsData.length + 1).fill(NaN);  // 加1长度 accommodate direct LLM
-            const completenessScores = Array(iterationsData.length + 1).fill(NaN);
-            const depthScores = Array(iterationsData.length + 1).fill(NaN);
-            const exampleScores = Array(iterationsData.length + 1).fill(NaN);
-            const logicScores = Array(iterationsData.length + 1).fill(NaN);
-
-            iterationsData.forEach((d, i) => {
-                d.scores_details.forEach(scoreDetail => {
-                    const idx = i + 1;  // 偏移位置以匹配Direct LLM位置
-                    switch (scoreDetail[0]) {
-                        case '準確性':
-                            accuracyScores[idx] = scoreDetail[1];
-                            break;
-                        case '全面性':
-                            completenessScores[idx] = scoreDetail[1];
-                            break;
-                        case '深度':
-                            depthScores[idx] = scoreDetail[1];
-                            break;
-                        case '相關例子':
-                            exampleScores[idx] = scoreDetail[1];
-                            break;
-                        case '論證的邏輯性':
-                            logicScores[idx] = scoreDetail[1];
-                            break;
+                // 首先發送直接 LLM 請求
+                fetch('/direct_llm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_question: userQuestion, additional_info: additionalInfo })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Direct LLM response:', data);
+                    if (data.direct_answer) {
+                        document.getElementById('directAnswerContent').innerText = data.direct_answer;
+                        document.getElementById('directTokens').innerText = data.direct_tokens;
+                        document.getElementById('directScore').innerText = data.direct_score.toFixed(2);
+                        document.getElementById('directAnswerSection').style.display = 'block';
+
+                        // 填充核心事實
+                        const coreFactsList = document.getElementById('coreFactsList');
+                        coreFactsList.innerHTML = ''; // 清空現有內容
+                        data.original_facts.split('\n').forEach(fact => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item';
+                            li.textContent = fact;
+                            coreFactsList.appendChild(li);
+                        });
+
+                        // 然後發送 main_loop 請求
+                        return fetch('/main_loop', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                user_question: userQuestion, 
+                                direct_answer: data.direct_answer, 
+                                direct_tokens: data.direct_tokens, 
+                                direct_score: data.direct_score, 
+                                additional_info: additionalInfo,
+                                original_facts: data.original_facts
+                            })
+                        });
+                    } else {
+                        throw new Error('No direct answer received');
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Main loop response:', data);
+                    if (data.final_answer) {
+                        document.getElementById('finalAnswerContent').innerText = data.final_answer;
+                        document.getElementById('finalTokens').innerText = data.total_tokens || 'N/A';
+                        document.getElementById('finalScore').innerText = (data.final_score || 0).toFixed(2);
+                        document.getElementById('finalAnswerSection').style.display = 'block';
+                    }
+                    if (data.comparison_result) {
+                        const comparisonResultContent = document.getElementById('comparisonResultContent');
+                        comparisonResultContent.innerHTML = '';  // 清空現有內容
+                        const resultParagraph = document.createElement('p');
+                        resultParagraph.textContent = data.comparison_result;
+                        comparisonResultContent.appendChild(resultParagraph);
+
+                        updateComparisonTable(data.initial_scores || [], data.final_scores || []);
+                        document.getElementById('comparisonResultSection').style.display = 'block';
+                    }
+                    if (data.iterations_data && Array.isArray(data.iterations_data)) {
+                        drawChart(data.initial_score || 0, data.iterations_data);
+                        document.getElementById('chartSection').style.display = 'block';
+                    } else {
+                        console.error('Invalid or missing iterations_data:', data.iterations_data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('發生錯誤：' + error.message);
+                })
+                .finally(() => {
+                    loadingSpinner.style.display = 'none';
+                    submitButton.disabled = false;
                 });
             });
 
-            const ctx = document.getElementById('iterationChart').getContext('2d');
-            const chart = new Chart(ctx, {
-                type: 'bar', // 使用 'bar' 类型创建初始图表
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: '總分 (Score)',
-                            data: scores,
-                            type: 'line', // 将数据集标记为 'line'
-                            borderColor: 'blue',
-                            fill: false
-                        },
-                        {
-                            label: '準確性 (Accuracy)',
-                            data: accuracyScores,
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '全面性 (Completeness)',
-                            data: completenessScores,
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '深度 (Depth)',
-                            data: depthScores,
-                            backgroundColor: 'rgba(255, 206, 86, 0.2)',
-                            borderColor: 'rgba(255, 206, 86, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '相關例子 (Examples)',
-                            data: exampleScores,
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '論證的邏輯性 (Logic)',
-                            data: logicScores,
-                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                            borderColor: 'rgba(153, 102, 255, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 10
-                        }
+            function clearPreviousResults() {
+                document.getElementById('directAnswerContent').innerText = '';
+                document.getElementById('finalAnswerContent').innerText = '';
+                document.getElementById('comparisonResultContent').innerText = '';
+                document.getElementById('coreFactsList').innerHTML = '';
+
+                document.getElementById('directAnswerSection').style.display = 'none';
+                document.getElementById('finalAnswerSection').style.display = 'none';
+                document.getElementById('comparisonResultSection').style.display = 'none';
+                document.getElementById('chartSection').style.display = 'none'; 
+            }
+
+            function updateComparisonTable(initialScores, finalScores) {
+                const table = document.getElementById('comparisonTable');
+                table.innerHTML = '';
+
+                const aspects = ['準確性', '全面性', '深度', '相關例子', '論證的邏輯性'];
+                aspects.forEach((aspect, index) => {
+                    const row = table.insertRow();
+                    row.insertCell(0).textContent = aspect;
+                    row.insertCell(1).textContent = initialScores[index]?.[1] || 'N/A';
+                    row.insertCell(2).textContent = finalScores[index]?.[1] || 'N/A';
+                });
+
+                const totalRow = table.insertRow();
+                totalRow.insertCell(0).textContent = '總分(/50)';
+                totalRow.insertCell(1).textContent = initialScores.reduce((sum, score) => sum + (score[1] || 0), 0);
+                totalRow.insertCell(2).textContent = finalScores.reduce((sum, score) => sum + (score[1] || 0), 0);
+            }
+
+            function drawChart(initialScore, iterationsData) {
+                try {
+                    if (!iterationsData || iterationsData.length === 0) {
+                        console.error('No iteration data available');
+                        return;
                     }
+
+                    const labels = ['Initial', ...iterationsData.map(d => `Iteration ${d.iteration}`)];
+                    const scores = [initialScore, ...iterationsData.map(d => (d.score || 0) * 10)];
+
+                    const getScoreOrDefault = (data, key) => data.scores?.find(s => s[0] === key)?.[1] || NaN;
+
+                    const accuracyScores = [NaN, ...iterationsData.map(d => getScoreOrDefault(d, '準確性'))];
+                    const completenessScores = [NaN, ...iterationsData.map(d => getScoreOrDefault(d, '全面性'))];
+                    const depthScores = [NaN, ...iterationsData.map(d => getScoreOrDefault(d, '深度'))];
+                    const exampleScores = [NaN, ...iterationsData.map(d => getScoreOrDefault(d, '相關例子'))];
+                    const logicScores = [NaN, ...iterationsData.map(d => getScoreOrDefault(d, '論證的邏輯性'))];
+
+                    const ctx = document.getElementById('iterationChart').getContext('2d');
+                    if (window.iterationChart instanceof Chart) {
+                        window.iterationChart.destroy();
+                    }
+                    window.iterationChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: '總分 (Score)',
+                                    data: scores,
+                                    type: 'line',
+                                    borderColor: 'blue',
+                                    fill: false,
+                                    yAxisID: 'y-axis-1'
+                                },
+                                {
+                                    label: '準確性 (Accuracy)',
+                                    data: accuracyScores,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y-axis-2'
+                                },
+                                {
+                                    label: '全面性 (Completeness)',
+                                    data: completenessScores,
+                                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                    borderColor: 'rgba(54, 162, 235, 1)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y-axis-2'
+                                },
+                                {
+                                    label: '深度 (Depth)',
+                                    data: depthScores,
+                                    backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                    borderColor: 'rgba(255, 206, 86, 1)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y-axis-2'
+                                },
+                                {
+                                    label: '相關例子 (Examples)',
+                                    data: exampleScores,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y-axis-2'
+                                },
+                                {
+                                    label: '論證的邏輯性 (Logic)',
+                                    data: logicScores,
+                                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                                    borderColor: 'rgba(153, 102, 255, 1)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y-axis-2'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                'y-axis-1': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    max: 10,
+                                    title: {
+                                        display: true,
+                                        text: '總分'
+                                    }
+                                },
+                                'y-axis-2': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    max: 10,
+                                    title: {
+                                        display: true,
+                                        text: '各項評分'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error in drawChart:', error);
+                    const chartError = document.createElement('div');
+                    chartError.className = 'alert alert-danger mt-2';
+                    chartError.textContent = `圖表繪製錯誤：${error.message}`;
+                    document.getElementById('chartSection').appendChild(chartError);
                 }
-            });
-        }
+            }
 
-        document.addEventListener("DOMContentLoaded", function() {
+            // Markdown 渲染
             const markdown = window.markdownit();
+            function renderMarkdown(elementId) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    const text = element.innerText;
+                    element.innerHTML = markdown.render(text);
+                }
+            }
 
-            // 將每個區塊內容轉換為 markdown
-            if (document.getElementById("directAnswerContent")) {
-                const directAnswerText = document.getElementById("directAnswerContent").innerText;
-                document.getElementById("directAnswerContent").innerHTML = markdown.render(directAnswerText);
-            }
-            if (document.getElementById("finalAnswerContent")) {
-                const finalAnswerText = document.getElementById("finalAnswerContent").innerText;
-                document.getElementById("finalAnswerContent").innerHTML = markdown.render(finalAnswerText);
-            }
-            if (document.getElementById("comparisonResultContent")) {
-                const comparisonResultText = document.getElementById("comparisonResultContent").innerText;
-                document.getElementById("comparisonResultContent").innerHTML = markdown.render(comparisonResultText);
+            // 在結果顯示後調用 Markdown 渲染
+            function renderAllMarkdown() {
+                renderMarkdown("directAnswerContent");
+                renderMarkdown("finalAnswerContent");
+                renderMarkdown("comparisonResultContent");
             }
         });
     </script>
 </body>
-</html>
