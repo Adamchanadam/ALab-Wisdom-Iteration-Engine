@@ -3,20 +3,19 @@ from openai import OpenAI
 import os
 import re
 import tiktoken
-import datetime
-import json
 from replit.object_storage import Client  # 引入 Replit Object Storage
 from firecrawl import FirecrawlApp  # 引入 Firecrawl
 import tiktoken
-import requests
-
+import datetime
 
 # 設置 Firecrawl API 金鑰
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 firecrawl_app = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
 
+CURRENT_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
+
 # 設置 Flask 應用程序
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 # 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -26,7 +25,6 @@ storage_client = Client()
 
 # 設置模型名稱
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
-COMPARISON_MODEL_NAME = "gpt-4o-mini-2024-07-18"
 
 
 # 記錄搜索日志
@@ -75,15 +73,16 @@ def format_answer(response):
 # 使用目標 LLM 生成答案
 def target_llm(prompt, additional_info=""):
     if additional_info:
-        prompt = f"以下是由用戶提供的可靠補充資料，請優先閱讀、分析這些資料來組織答案：\n\n{additional_info}\n\n{prompt}"
-    full_prompt = f"{prompt}"
+        prompt = f"今天是 {CURRENT_DATE}。以下是原始的補充資料(參考資料不一定正確)，請謹慎地分析、篩選合適的資料來組織答案，留意資料中所屬的時間範圍是否與問題有關，如果問題涉及 2023 年10月前你要運用你的知識庫去回答，再用補充資料來輔助(如有);如果問題涉及 2023 年10月後，你要從補充資料中提取有關資料去回答(如有)，再用知識庫去輔助 ：\n\n{additional_info}\n\n{prompt}"
+    full_prompt = f"今天是 {CURRENT_DATE}。{prompt}"
     response = client.chat.completions.create(model=MODEL_NAME,
                                               messages=[{
                                                   "role": "user",
-                                                  "content": full_prompt
+                                                  "content": 
+                                                  f"根據以下問題以繁體中文生成答案：{prompt}"
                                               }],
                                               max_tokens=2000,
-                                              temperature=0.5)
+                                              temperature=0.3)
     answer = format_answer(response)
     tokens_used = response.usage.total_tokens
     print(f"[INFO] target_llm: tokens_used = {tokens_used}")  # 添加日誌
@@ -92,17 +91,19 @@ def target_llm(prompt, additional_info=""):
 # 直接使用 LLM 生成答案
 def direct_llm(prompt, additional_info=""):
     if additional_info:
-        full_additional_info = handle_additional_info(additional_info)
-        prompt = f"以下是由用戶提供的可靠補充資料，請優先閱讀、分析這些資料來組織答案：\n\n{full_additional_info}\n\n{prompt}"
+        additional_info_processed = handle_additional_info(additional_info)
+        full_additional_info = additional_info_processed["content"]
+
+        prompt = f"今天是 {CURRENT_DATE}。以下是原始的補充資料(參考資料不一定正確)，請謹慎地分析、篩選合適的資料來組織答案，留意資料中所屬的時間範圍是否與問題有關，如果問題涉及 2023 年10月前你要運用你的知識庫去回答，再用補充資料來輔助(如有);如果問題涉及 2023 年10月後，你要優先從補充資料中提取有關資料去回答(如有)，再用知識庫去輔助 ：\n\n{full_additional_info}\n\n{prompt}"
     response = client.chat.completions.create(model=MODEL_NAME,
                                               messages=[{
                                                   "role":
                                                   "user",
                                                   "content":
-                                                  f"根據以下問題生成答案：{prompt}"
+                                                  f"根據以下問題以繁體中文生成答案：{prompt}"
                                               }],
                                               max_tokens=2000,
-                                              temperature=0.7)
+                                              temperature=0.3)
     answer = format_answer(response)
     tokens_used = response.usage.total_tokens
     print(f"[INFO] direct_llm: tokens_used = {tokens_used}")  # 添加日誌
@@ -115,24 +116,30 @@ def handle_additional_info(additional_info, token_limit=None):
     urls = re.findall(r'http[s]?://\S+', additional_info)
     relevant_content = ""
     encoder = tiktoken.encoding_for_model(MODEL_NAME)
-    if urls:
-        for url in urls[:3]:  # 限制最多處理 3 條網址
+
+    valid_urls = []
+    for url in urls[:3]:  # 限制最多處理 3 條網址
+        if not re.search(r'\.(jpeg|jpg|gif|png|bmp|svg|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|txt)$', url, re.I):
+            valid_urls.append(url)
+
+    if valid_urls:
+        for url in valid_urls:
             if url in cached_data:
                 content = cached_data[url]
-                print(f"[INFO] Using cached content for url {url}")
+                print(f"[INFO] 使用快取內容，網址 {url}")
             else:
                 try:
                     scrape_result = firecrawl_app.scrape_url(url, params={'formats': ['markdown']})
-                    print(f"[INFO] scrape_result for url {url}: {scrape_result}")
+                    print(f"[INFO] 抓取結果，網址 {url}: {scrape_result}")
 
                     # 修正：直接從 scrape_result 中獲取 metadata 和 markdown
                     status_code = scrape_result.get('metadata', {}).get('statusCode')
                     content = scrape_result.get('markdown', '')
 
                     if status_code == 200:
-                        print(f"[INFO] Content successfully extracted for url {url}")
-                        print(f"[INFO] Status code: {status_code}")
-                        print(f"[INFO] Extracted content preview: {content[:100]}...")  # 日誌顯示首100字符
+                        print(f"[INFO] 成功提取內容，網址 {url}")
+                        print(f"[INFO] 狀態碼: {status_code}")
+                        print(f"[INFO] 提取內容預覽: {content[:100]}...")  # 日誌顯示首100字符
                         if content:
                             # 提取元數據
                             metadata = scrape_result.get('metadata', {})
@@ -141,7 +148,7 @@ def handle_additional_info(additional_info, token_limit=None):
 
                             # 將元數據添加到內容中
                             content = f"標題: {title}\n描述: {description}\n\n{content}"
-                            print(f"*** Firecrawl extracted Content: {content[:500]}...")  # 只打印前500個字符
+                            #print(f"*** Firecrawl 提取內容: {content[:500]}...")  # 只打印前500個字符
 
                             tokenize_content = encoder.encode(content)
                             if token_limit and len(tokenize_content) > token_limit:
@@ -149,16 +156,20 @@ def handle_additional_info(additional_info, token_limit=None):
                             cached_data[url] = content
                             relevant_content += f"來源: {url}\n{content}\n\n"
                         else:
-                            print(f"[INFO] Status code 200 but no content for url {url}")
+                            print(f"[INFO] 狀態碼 200 但無內容，網址 {url}")
                     else:
-                        print(f"[INFO] Unexpected status code {status_code} for url {url}")
+                        print(f"[INFO] 意外狀態碼 {status_code}，網址 {url}")
                     cached_data[url] = content  # 無論內容是否為空,都快取結果
                 except Exception as e:
-                    print(f"[ERROR] Exception while scraping url {url}: {e}")
+                    print(f"[錯誤] 抓取網址 {url} 時發生異常: {e}")
                     cached_data[url] = ""
 
     sanitized_additional_info = re.sub(r'\s+', ' ', additional_info).strip()
-    return relevant_content + "\n" + sanitized_additional_info
+
+
+    return {
+        "content": relevant_content + "\n" + sanitized_additional_info
+    }
 
 # 評估生成的答案質量
 def evaluation_llm(user_question, generated_answer, original_facts, additional_info=""):
@@ -180,7 +191,7 @@ def evaluation_llm(user_question, generated_answer, original_facts, additional_i
 - 如果有補充資料，答案是否完全覆蓋了這些信息？
 - 答案是否提供了額外的有價值信息？
 
-為每個方面打分，並給出簡要評論。最後，給出 "總評分"（滿分50分）和 "改進建議"。
+為每個方面打分，並給出簡要評論。最後，以繁體中文給出 "總評分"（滿分50分）和 "改進建議"。
 請確保在評分後明確標註"總評分："，例如"總評分：42/50"。
 """
 
@@ -188,7 +199,7 @@ def evaluation_llm(user_question, generated_answer, original_facts, additional_i
         model=MODEL_NAME,
         messages=[{"role": "user", "content": eval_prompt}],
         max_tokens=800,
-        temperature=0.3
+        temperature=0.2
     )
 
     evaluation = response.choices[0].message.content.strip()
@@ -220,17 +231,15 @@ def optimizer_llm(user_question, current_answer, evaluation, original_facts):
 
 請根據以上信息，生成一個新的、更優化的回答。在優化過程中，請特別注意以下幾點：
 
-1. 仔細閱讀評估結果中的 "改進建議"，並確保在新答案中針對性地解決這些問題。
-2. 保留並強化原答案中被評為優秀的部分。
+1. 仔細閱讀評估結果中的 "改進建議"，並確保在新答案中針對性地應用這些建議。
+2. 保留並強化原答案中被評為優秀的部分，並且要邏輯連貫。
 3. 確保新答案準確包含並強調核心事實。
 4. 提供更深入、更全面的分析，包括可能的原因、影響和未來趨勢。
 5. 增加相關的具體例子來支持您的論點。
 6. 引用可靠的學術研究數據去支持論點，必須提供資料來源和出處。
-7. 使用中英對照解釋專業名詞、人名、地方名、公司名稱等。
-8. 對於不確定的內容，明確表示不確定性。
-9. 確保回答的結構清晰，邏輯連貫。
+7. 對於不確定的內容，明確表示不確定性。
 
-請基於以上指導原則，生成一個新的、更優化的回答："""
+請基於以上指導原則，以繁體中文生成一個新的、更優化的回答："""
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -246,18 +255,18 @@ def extract_core_facts(answer, question):
 
 {answer}
 
-請列出最重要的1-3個核心事實，特別要留意日期、時間的邏輯關係。格式為簡潔的要點列表。"""
+今天是 {CURRENT_DATE}。請列出最重要的 1-3 個核心事實，不能根據推測。若問題涉及日期或時間的概念，請確保使用有效且符合問題要求的資料來回答（例如：問題詢問 2020 年的 CPI 經濟數據，必須使用 2020 年的資料）。如答案中資料的時間與問題要求的時間範圍不符，請明確指出。如果問題涉及 2023 年 10 月前的資料，請使用你的知識庫回答；若問題涉及 2023 年 10 月後的資料，請從補充資料中提取相關內容（如有）。回答格式應為簡潔的要點列表。"""
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=200,
-        temperature=0.3
+        temperature=0.1
     )
 
     return response.choices[0].message.content.strip()
 
-def fact_check(answer, core_facts):
+def fact_check(answer, core_facts, question):
     prompt = f"""請檢查以下回答是否包含並正確陳述了這些核心事實：
 
 核心事實：
@@ -266,13 +275,16 @@ def fact_check(answer, core_facts):
 回答：
 {answer}
 
-如果回答中缺少任何核心事實或有錯誤陳述，請直接修改回答以包含正確的核心事實，不要添加任何評論，特別要留意日期、時間的邏輯關係。如果回答已經正確包含了所有核心事實，請直接返回原回答。無論如何，請不要在回答中包含任何關於核心事實檢查的元描述或評論。"""
+問題：
+{question}
+
+今天是 {CURRENT_DATE}。請檢查回答的資料年份是否符合問題要求的時間範圍。如果問題涉及 2023 年 10 月前的內容，使用你的知識庫回答；若涉及 2023 年 10 月後，從補充資料中提取相關內容（如有）。如回答缺少或錯誤陳述核心事實，請直接修改並提供正確答案，不需添加評論；若回答正確無誤，則直接返回原回答。請避免在回答中包含任何檢查過程的描述或評論。"""
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1000,
-        temperature=0.3
+        temperature=0.1
     )
 
     return response.choices[0].message.content.strip()
@@ -288,8 +300,10 @@ def main_loop(user_question, additional_info="", original_facts=""):
     full_question = user_question
     additional_content = ""
     if additional_info:
-        additional_content = handle_additional_info(additional_info)
-        full_question = f"以下是由用戶提供的可靠補充資料，請優先閱讀、分析這些資料來組織答案：\n\n{additional_content}\n\n{user_question}"
+        additional_info_processed = handle_additional_info(additional_info)
+        additional_content = additional_info_processed["content"]
+
+        full_question = f"以下是原始的補充資料，請謹慎地分析、篩選合適的資料來組織答案，留意資料中涉及的時間範圍(如有)是否與問題有關 ：\n\n{additional_content}\n\n{user_question}"
 
     initial_answer, initial_tokens = target_llm(full_question)
     logs.append(initial_answer)
@@ -304,7 +318,7 @@ def main_loop(user_question, additional_info="", original_facts=""):
     answer = initial_answer
     context = ""
     iteration_count = 0
-    max_iterations = 3
+    max_iterations = 2 # 2 = 3 次
     best_score = initial_score
     best_answer = answer
     best_scores = initial_scores
@@ -347,7 +361,7 @@ def main_loop(user_question, additional_info="", original_facts=""):
         answer, tokens = target_llm(new_full_question, context)
 
         # 事實檢查步驟
-        answer = fact_check(answer, core_facts)
+        answer = fact_check(answer, core_facts, user_question)
 
         total_tokens += tokens
         iteration_count += 1
@@ -363,9 +377,11 @@ def main_loop(user_question, additional_info="", original_facts=""):
 核心事實：{core_facts}
 優化後的回答：{best_answer}
 
-生成的回答應該是完整的、可以獨立閱讀的，不應包含任何元描述或評論。請確保回答準確、全面、有深度，並包含相關例子和邏輯論證。"""
-
+回答應該是完整的、可以獨立閱讀的 'best_answer' 內容，包括所有細節、相關例子、邏輯論證、資料出處。請確保回答準確、全面、有學術深度。使用中英對照解釋專業名詞、人名、地方名、公司名稱等。如果內容裡包括數字、中文與英文，字與字之間要加入 (空隔) 作分隔，方便閱讀 (例如︰約翰 (John) 是一位老師, 英國國家統計局 (ONS) 為英國統計局的執行機構, 明年是 2025 年)。"""
+    #但不應包含任何元描述或評論
+    
     final_answer, final_tokens = target_llm(final_prompt)
+    #print(f"*** main_loop *** final_answer Markdown content:\n{final_answer}")
     total_tokens += final_tokens
 
     # 比較初始回答和最終回答
@@ -374,6 +390,7 @@ def main_loop(user_question, additional_info="", original_facts=""):
     response_data = {
         'initial_answer': initial_answer,
         'final_answer': final_answer,
+        'final_answer_markdown': final_answer,
         'initial_score': initial_score * 10,  # 轉為10分制
         'final_score': best_score * 10,  # 轉為10分制
         'initial_tokens': initial_tokens,
@@ -409,8 +426,7 @@ def compare_answers(user_question, direct_answer, final_answer, direct_scores, f
 4. 相關例子 ︰評估是否提供了相關範例，並檢視範例的具體性與描述完整性。
 5. 論證的邏輯性：評估兩個回答的論證結構和邏輯流程。分析論點之間的連貫性和推理的合理性。
 
-
-請提供一個分析報告，突出兩個回答之間的主要差異和各自的優缺點。最後，給出一個綜合評價，說明推薦使用哪個答案更好。
+請以 200 字內繁體中文，提供一份分析報告，突出兩個回答之間的主要差異。最後，說明推薦使用哪個答案更好。
 
 關於 "{user_question}" 的答案分析報告：
 """
@@ -418,7 +434,7 @@ def compare_answers(user_question, direct_answer, final_answer, direct_scores, f
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[{"role": "user", "content": comparison_prompt}],
-        max_tokens=1000,
+        max_tokens=600,
         temperature=0.7
     )
 
